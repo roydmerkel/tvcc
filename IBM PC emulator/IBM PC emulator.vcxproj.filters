@@ -17,9 +17,4 @@
   <ItemGroup>
     <Text Include="readme.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="..\Project\AUTHORS">
-      <Filter>Source Files</Filter>
-    </None>
-  </ItemGroup>
 </Project>
