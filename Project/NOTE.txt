@@ -1,0 +1,7 @@
+This directory contains the source code files for a special version of the PCE
+emulator code designed to be split up into individual .DLL files for each
+emulated system component, allowing the user to easily recompile, add, and
+replace each one in the same way as in a real machine.
+
+This project will eventually be merged into the main SoftMuseum code once it
+becomes stable.

@@ -1,0 +1,50 @@
+.TH PFI 1 "2014-01-06" "HH" "pce"
+\
+.SH NAME
+pfi \- convert and modify PFI flux images
+
+.SH SYNOPSIS
+.BI pfi " [options] [input-file] [options] [output-file]"
+
+.SH DESCRIPTION
+\fBpfi\fR(1) is used to modify and convert PFi flux image files.
+
+.SH OPTIONS
+.TP
+.B "-f, --info"
+Print information about the current image or the next image loaded.
+\
+.TP
+.BI "-i, --input " filename
+Load an image from \fIfilename\fR.
+\
+.TP
+.B "-l, --list-tracks"
+List all tracks in the current image or in the next image loaded.
+\
+.TP
+.BI "-o, --output " filename
+Set the output file name. Before exiting, the current image will
+be written to this file.
+\
+.TP
+.B "-v, --verbose"
+Enable verbose operation.
+\
+.TP
+.B --help
+Print usage information.
+\
+.TP
+.B --version
+Print version information.
+
+.SH SEE ALSO
+.BR pce-ibmpc "(1),"
+.BR pce-macplus "(1),"
+.BR pce-img "(1)"
+.BR pri "(1)"
+.BR psi "(1)"
+
+.SH AUTHOR
+Hampa Hug <hampa@hampa.ch>

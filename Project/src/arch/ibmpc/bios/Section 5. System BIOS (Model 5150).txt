@@ -1,0 +1,835 @@
+--------------------------------------------------------------------------
+Section 5. System BIOS:
+--------------------------------------------------------------------------
+Contents:
+--------------------------------------------------------------------------
+System BIOS Usage                                  : 5-3
+ - Vectors with Special Meanings                   : 5-6
+ - Other Read/Write Memory Usage                   : 5-8
+ - BIOS Programming Hints                          : 5-13
+ - Adapter Cards with System-Accessible ROM Modules: 5-13
+Keyboard Encoding and Usage                        : 5-14
+ - Encoding                                        : 5-14
+ - Extended Codes                                  : 5-18
+ - Shift States                                    : 5-19
+ - Special Handling                                : 5-20
+ - Extended Functions                              : 5-21
+ - Keyboard Usage                                  : 5-22
+BIOS Cassette Logic                                : 5-25
+ - Software Algorithms - Interrupt Hex 15          : 5-25
+ - Cassette Write                                  : 5-25
+ - Cassette Read                                   : 5-26
+ - Data Record Architecture                        : 5-27
+ - Error Recovery                                  : 5-28
+System BIOS Listing                                : 5-29
+ - Quick Reference                                 : 5-29
+--------------------------------------------------------------------------
+System BIOS Usage:
+--------------------------------------------------------------------------
+The basic input/output system (BIOS) resides in ROM on the system board
+and provides device level control for the major I/O devices in the system.
+Additional ROM modules may be located on option adapters to provide device
+level control for that option adapter. BIOS routines enable the assembler
+language programmer to perform block (disk and diskette) or character-
+level I/O operations without concern for device address and operating
+characteristics. System services, such as time-of-day and memory size
+determination, are provided by the BIOS.
+
+The goal is to provide an operational interface to the system and relieve
+the programmer of the concern about the characteristics of hardware
+devices. The BIOS interface insulates the user from the hardware, thus
+allowing new devices to be added to the system, yet retaining the BIOS
+level interface to the device. In this manner, user programs become
+transparent to hardware modifications and enhancements.
+
+The IBM Personal Computer MACRO Assembler manual and the IBM Personal
+Computer Disk Operating System (DOS) manual provide useful programming
+information related to this section. A complete listing of the BIOS is
+given in this section.
+
+Access to the BIOS is through the 8088 software interrupts. Each BIOS
+entry point is available through its own interrupt.
+
+The software interrupts, hex 10 through hex 1A, each access a different
+BIOS routine. For example, to determine the amount of memory available in
+the system,
+
+   INT 12H
+
+invokes the BIOS routine for determining memory size and returns the value
+to the caller.
+--------------------------------------------------------------------------
+Parameter Passing:
+--------------------------------------------------------------------------
+All parameters are passed to and from the BIOS routines go through the
+8088 registers. The prologue of each BIOS function indicates the registers
+used on the call and the return. For the memory size example, no
+parameters are passed. The memory size, in 1K-byte increments, is returned
+in the AX register.
+
+If a BIOS function has several possible operations, the AH register is
+used at input to indicate the desired operation. For example, to set the
+time of day, the following code is required:
+
+MOV AH, 1                      ;function is to set time of day.
+MOV CX,HIGH__COUNT             ;establish the current time.
+MOV DX,LOW__COUNT
+INT 1AH                        ;set the time.
+
+To read the time of day:
+
+MOV AH,0                       ;function is to read time of day.
+INT 1AH                        ;read the timer.
+
+Generally, the BIOS routines save all registers except for AX and the
+flags. Other registers are modified on return only if they are returning
+a value to the caller. The exact register usage is in the prologue of
+each BIOS function.
+--------------------------------------------------------------------------
+8088 Software Interrupt Listing
+--------------------------------------------------------------------------
+Address (Hex): Interrupt Number: Name                  : BIOS Entry      :
+ - 0-3:         -  0:             - Divide by Zero:       - D__EOI
+ - 4-7:         -  1:             - Single Step:          - D__EOI
+ - 8-B:         -  2:             - Nonmaskable:          - NMI__INT
+ - C-F:         -  3:             - Breakpoint:           - D__EOI
+ - 10-13:       -  4:             - Overflow:             - D__EOI
+ - 14-17:       -  5:             - Print Screen          - PRINT__SCREEN
+ - 18-1B:       -  6:             - Reserved:             - D__EOI
+ - 1D-1F:       -  7:             - Reserved:             - D__EOI
+ - 20-23:       -  8:             - Time of Day:          - TIMER__INT
+ - 24-27:       -  9:             - Keyboard:             - KB__INT
+ - 28-2B:       -  A:             - Reserved:             - D__EOI
+ - 2C-2F:       -  B:             - Communications:       - D__EOI
+ - 30-33:       -  C:             - Communications:       - D__EOI
+ - 34-37:       -  D:             - Disk:                 - D__EOI
+ - 38-3B:       -  E:             - Diskette:             - DISK__INT
+ - 3C-3F:       -  F:             - Printer:              - D__EOI
+ - 40-43:       - 10:             - Video:                - VIDEO__IO
+ - 44-47:       - 11:             - Equipment Check:      - EQUIPMENT
+ - 48-4B:       - 12:             - Memory:               - MEMORY_SIZE
+                                                            __DETERMINE
+ - 4C-4F:       - 13:             - Diskette/Disk:        - DISKETTE__IO
+ - 50-53:       - 14:             - Communications:       - RS232__IO
+ - 54-57:       - 15:             - Cassette:             - CASSETTE__IO
+ - 58-5B:       - 16:             - Keyboard:             - KEYBOARD__IO
+ - 5C-5F:       - 17:             - Printer:              - PRINTER__IO
+ - 60-63:       - 18:             - Resident BASIC:       - F600:0000
+ - 64-67:       - 19:             - Bootstrap:            - BOOT__STRAP
+ - 68-6B:       - 1A:             - Time of Day:          - TIME__OF__DAY
+ - 6C-6F:       - 1B:             - Keyboard Break:       - DUMMY__RETURN
+ - 70-73:       - 1C:             - Timer Tick:           - DUMMY__RETURN
+ - 74-77:       - 1D:             - Video Initialization: - VIDEO_PARMS
+ - 78-7B:       - 1E:             - Diskette Parameters:  - DISK__BASE
+ - 7C-7F:       - 1F:        - Video Graphics Characters: - 0
+ - 100-103:     - 40:        - Diskette pointer save area for Fixed Disk:
+ - 104-107:     - 41:             - Fixed Disk Parameters:- FD__TBL
+ - 168-16B:     - 5A:             - Cluster:              - FD__TBL
+ - 16C-16F:     - 5B:        - Used by Cluster Program:   - N/A
+ - 180-19F:     - 60-67:     - Reserved for User Programs:- N/A
+--------------------------------------------------------------------------
+Vectors with Special Meanings:
+--------------------------------------------------------------------------
+Interrupt Hex 1B - Keyboard Break Address:
+
+This vector points  to the code to be used when the Ctrl and Break keys
+are pressed on the keyboard. The vector is invoked while responding to
+the keyboard interrupt, and control should be return through an IRET
+instruction. The power-on routines initialize the vector to an IRET
+instruction, so that nothing will occur when the Ctrl and Break keys are
+pressed unless the applications program sets a different value.
+
+Control may be retained by this routine, with the following problems. The
+Break may have occured during interrupt processing, so that one or more
+End of Interrupt commands must be sent to the 8259 Controller. Also, all
+I/O devices should be reset in case an operation was underway at that
+time.
+
+Interrupt Hec 1c - Timer Tick:
+
+This vector points to the code to be executed on every system-clock tick.
+This vector is invoked while responding to the timer interrupt, and
+control should be returned through an IRET instruction. The power-on
+routines initialize this vector to point to an IRET instruction, so that
+nothing will occur unless the application modifies the pointer. It is the
+responsibility of the application to save and restore all registers that
+will be modified.
+
+Interrupt Hex 1D - Video Parameters:
+
+This vector points to a data region containing the parameters required
+for the initialization of the 6845 on the video card. Note that there are
+four separate tables, and all four must be reproduced if all modes of
+operation are to be supported. The power-on routines initialize this
+vector to point to the parameters contained in the ROM video routines.
+
+Interrupt Hex 1E - Diskette Parameters:
+
+This vector points to a data region containing the parameters required
+for the diskette drive. The power-on routines initialize the vector to
+point to the parameters contained in the ROM diskette routine. These
+default parameters represent the specified values for any IBM drives
+attached to the system. Changing this parameter block may be necessary to
+reflect the specifications of the other drives attached.
+
+Interrupt Hex 1F - Graphics Character Extensions:
+
+When operating in the graphics modes of the IBM Color/Graphics Monitor
+Adapter (320 by 200 or 640 by 200), the read/write character interface
+forms the character from the ASCII code point, using a set of dot
+patterns. The dot patterns for the first 128 code points are contained in
+ROM. To access the second 128 code points, this vector must be
+established to point at a table of up to 1K bytes, where each dode point
+is represented by eight bytes of graphic information. At power-on, this
+vector is initialized to 000:0, and it is the responsibility of the user
+to change this vector if additional code points are required.
+
+Interrupt Hex 40 - Reserved:
+
+When an IBM Fixed Disk Adapter is installed, the BIOS routines use
+interrupt hex 30 to revector the diskette pointer.
+
+Interrupt Hex 41 - Fixed Disk Parameters:
+
+This vector points to a data region containing the parameters required
+for the fixed disk drive. The power-on routines initialize the vector to
+point to the parameters contained in the ROM disk routine. These default
+parameters represent the specified values for any IBM fixed disk drives
+attached to the system. Chaning this parameter block may be necessary to
+reflect the specifications of the other fixed disk drives attached.
+--------------------------------------------------------------------------
+Other Read/Write Memory Usage:
+--------------------------------------------------------------------------
+The IBM BIOS routines use 256 bytes of memory from absolute hex 400 to
+hex 4FF. Locations hex 400 to 407 contain the base addresses of any RS-
+232 cards attached to the system. Locations hex 408 to 40F contain the
+base addresses of the Printer Adapter.
+
+Memory locations hex 300 to 3FF are used as a stack area during the power
+-on initialization, and bootstrap when control is passed to it from power
+-on. If the user desires the stack in a different area, the area must be
+set by the application.
+--------------------------------------------------------------------------
+BASIC and DOS Reserved Interrupts:
+--------------------------------------------------------------------------
+Address (Hex):|Interrupt (Hex):|Function:
+ - 80-83:     | - 20:          | - DOS Program Terminate
+ - 84-87:     | - 21:          | - DOS Function Call
+ - 88-8B:     | - 22:          | - DOS Terminate Address
+ - 8C-8F:     | - 23:          | - DOS Ctrl Break Exit Address
+ - 90-93:     | - 24:          | - DOS Fatal Error Vector
+ - 94-97:     | - 25:          | - DOS Absolute Disk Read
+ - 98-9B:     | - 26:          | - DOS Absolute Disk Write
+ - 9C-9F:     | - 27:          | - DOS Terminate, Fix In Storage
+ - A0-FF:     | - 28-3F:       | - Reserved for DOS
+ - 100-17F:   | - 40-5F:       | - Reserved
+ - 180-19F:   | - 60-67:       | - Reserved for User Software Interrupts
+ - 1A0-1FF:   | - 68-7F:       | - Not Used
+ - 200-217:   | - 80-85:       | - Reserved by BASIC
+ - 218-3C3:   | - 86-F0:       | - Used by BASIC Interpreter while BASIC
+              |                |   is running
+ - 3C4-3FF:   | - F1-FF:       | - Not Used
+--------------------------------------------------------------------------
+Reserved Memory Locations:
+--------------------------------------------------------------------------
+Address (Hex):|Mode:       |Function:
+ - 400-48F:   | - ROM BIOS | - See BIOS LISTING
+ - 490-4EF:   | -          | - Reserved
+ - 4F0-4FF:   | -          | - Reserved as Intra Application
+              |            | Communication Area for any application
+ - 500-5FF:   | -          | - Reserved for DOS and BASIC
+ - 500:       | - DOS      | - Print Screen Status Flag Store
+              |            | - 0-Print Screen Operation Not Active or
+              |            | Successful
+              |            | - Print Screen Operation
+              |            | - 1-Print Screen In Progress
+              |            | - 255-Error Encountered during Print Screen
+              |            | Operation
+ - 504:       |            | - Single Drive Mode Status Byte
+ - 510-511:   | - BASIC    | - BASIC's Segment Address Byte
+ - 512-515:   | - BASIC    | - Clock Interrupt Vector Segment: Offset
+              |            | Store
+ - 516-519:   | - BASIC    | - Break Key Interrupt Vector Segment: Offset
+              |            | Store
+ - 51A-51D:   | - BASIC    | - Disk Error Interrupt Vector Segment:
+              |            | Offset Store
+--------------------------------------------------------------------------
+BASIC Workspace Variables:
+--------------------------------------------------------------------------
+If you do DEF SEG (default workspace segment):
+                                               Offset (Hex Value):Length:
+ - Line number of current line being executed:  - 2E               - 2
+ - Line number of last error:                   - 347              - 2
+ - Offset into segment of start of program text:- 358              - 2
+ - Offset into segment of start of variables    - 358              - 2
+     (end of program text 1-1):
+ - Keyboard buffer contents:                    - 6A               - 1
+     if 0-no characters in buffer
+     if 1-characters in buffer
+ - Character color in graphics mode:            - 4E               - 1
+     Set to 1, 2, or 3 to get text in colors 1 to 3.
+     Do not set to 0.
+     (Default = 3)
+EXAMPLE:
+ - 100 Print  PEEK (&H2E) + 256*PEEK (&H2F)
+      /           L           H
+      \
+      /
+      100       Hex 64      Hex 00
+--------------------------------------------------------------------------
+BIOS Memory Map:
+--------------------------------------------------------------------------
+Starting Address in Hex:
+ - 00000: BIOS Interrupt Vectors
+ - 00080: Available Interrupt Vectors
+ - 00400: BIOS Data Area
+ - 00500: User Read/Write Memory
+ - C8000: Disk Adapter
+ - F0000: Read Only Memory
+ - FE000: Bios program area
+--------------------------------------------------------------------------
+BIOS Programming Hints:
+--------------------------------------------------------------------------
+The BIOS code is invoked through software interrupts. The programmer
+should not ''hard code'' BIOS addresses into application programs. The
+internal workings and absolute addresses within BIOS are subject to
+change without notice.
+
+If an error is reported by the disk or diskette code, you should reset
+the drive adapter and retry the operation. A specified number of retries
+should not be required on diskette reads to ensure the problem is not due
+to motor start-up.
+
+When altering I/O-port bit values, the programmer should change only
+those bits that are necessary to the current task. Upon completion, the
+programmer should restore the original environment. Failure to adhere to
+this practice may be incompatible with present and future applications.
+--------------------------------------------------------------------------
+Adapter Cards with System-Accessible ROM Modules:
+--------------------------------------------------------------------------
+The ROM BIOS provides a facility to integrate adapter cards with on-board
+ROM code into the system. During the POST, interrupt vectors are
+established for the BIOS calls. After the default vectors are in place, a
+scan for additional ROM modules takes place. At this point, a ROM routine
+on the adapter card may gain control. The routine may establish or
+intercept interrupt vectors to hook themselves into the system.
+
+The absolute addresses hex C8000 through hex F4000 are scanned in 2K
+blocks in search of a valid adapter card ROM. A valid ROM is defined as
+follows:
+
+ - Byte 0: Hex 55
+ - Byte 1: Hex AA
+ - Byte 2: A length indicator representing the number of 512-byte blocks
+ in the ROM (length/512). A checksum is also done to test the integrity
+ of the ROM module. Each byte in the defined ROM is summed modulo hex 100.
+ This sum must be 0 for the module to be deemed valid.
+
+When the POST identifies a valid ROM, it does a far call to byte 3 of the
+ROM (which should be executable code). The adapter card may now perform
+its power-on initialization tasks. The feature ROM should return control
+to the BIOS routines by executing a far return.
+--------------------------------------------------------------------------
+Keyboard Encoding and Usage:
+--------------------------------------------------------------------------
+Encoding:
+--------------------------------------------------------------------------
+The keyboard routine provided by IBM in the ROM BIOS is responsible for
+converting the keyboard scan codes into what will be termed ''Extended
+ASCII.''
+
+Extended ASCII encompasses one-byte character codes with possible values
+of 0 to 255, an extended code for certain extended keyboard functions, and
+functions handled within the keyboard routine or through interrupts.
+--------------------------------------------------------------------------
+Character Codes:
+--------------------------------------------------------------------------
+The following character codes are passed through the BIOS keyboard routine
+to the system or application program. A '-1' means the combination is
+suppressed in the keyboard routine. The codes are returned in AL.
+
+Notes: 1. Refer to ''Extended Codes'' in this section.
+       2. Refer to ''Special Handling'' in this section.
+--------------------------------------------------------------------------
+Key Number:  Base Case         :Upper Case       :Ctrl         :Alt      :
+ -  1:        - Esc            : - Esc           : - Esc       : - - 1   :
+ -  2:        - 1              : - !             : - - 1       : - Note 1:
+ -  3:        - 2              : - @             : - Nul (000)
+                                                      Note 1   : - Note 1:
+ -  4:        - 3              : - #             : - - 1       : - Note 1:
+ -  5:        - 4              : - $             : - - 1       : - Note 1:
+ -  6:        - 5              : - %             : - - 1       : - Note 1:
+ -  7:        - 6              : - ^             : - RS(030)   : - Note 1:
+ -  8:        - 7              : - &             : - - 1       : - Note 1:
+ -  9:        - 8              : - *             : - - 1       : - Note 1:
+ - 10:        - 9              : - (             : - - 1       : - Note 1:
+ - 11:        - 0              : - )             : - - 1       : - Note 1:
+ - 12:        - -              : - _             : - US(031)   : - Note 1:
+ - 13:        - =              : - +             : - - 1       : - Note 1:
+ - 14:        - Backspace (008): - Backspace(008): - Del (127) : - - 1   :
+ - 15:        - ---->|(009)    : - |<---(Note 1) : - - 1       : - - 1   :
+ - 16:        - q              : - Q             : - DC1(017)  : - Note 1:
+ - 17:        - w              : - W             : - ETB(023)  : - Note 1:
+--------------------------------------------------------------------------
+Character Codes (Part 2 of 3):
+--------------------------------------------------------------------------
+Key Number:  Base Case             :Upper Case     :Ctrl       :Alt      :
+ - 18          :  - e              : - E           : - ENQ(005): - Note 1:
+ - 19          :  - r              : - R           : - DC2(018): - Note 1:
+ - 20          :  - t              : - T           : - DC4(020): - Note 1:
+ - 21          :  - y              : - Y           : -  EM(025): - Note 1:
+ - 22          :  - u              : - U           : - NAK(021): - Note 1:
+ - 23          :  - i              : - I           : -  HT(009): - Note 1:
+ - 24          :  - o              : - O           : -  SI(015): - Note 1:
+ - 25          :  - p              : - P           : - DLE(016): - Note 1:
+ - 26          :  - [              : - {           : - Esc(027): - - 1   :
+ - 27          :  - ]              : - }           : -  GS(029): - - 1   :
+ - 28          :  - CR             : - CR          : -  LF(010): - - 1   :
+ - 29 Ctrl     :  - - 1            : - - 1         : - - 1     : - - 1   :
+ - 30          :  - a              : - A           : - SOH(001): - Note 1:
+ - 31          :  - s              : - S           : - DC3(019): - Note 1:
+ - 32          :  - d              : - D           : - EOT(004): - Note 1:
+ - 33          :  - f              : - F           : - ACK(006): - Note 1:
+ - 34          :  - g              : - G           : - BEL(007): - Note 1:
+ - 35          :  - h              : - H           : -  BS(008): - Note 1:
+ - 36          :  - j              : - J           : -  LF(010): - Note 1:
+ - 37          :  - k              : - K           : -  VT(011): - Note 1:
+ - 38          :  - l              : - L           : -  FF(012): - Note 1:
+ - 39          :  - ;              : - :           : - - 1     : - - 1   :
+ - 40          :  - '              : - "           : - - 1     : - - 1   :
+ - 41          :  - `              : - ~           : - - 1     : - - 1   :
+ - 42 Shift    :  - - 1            : - - 1         : - - 1     : - - 1   :
+ - 43          :  - \              : - |           : -  FS(028): - - 1   :
+ - 44          :  - z              : - Z           : - SUB(026): - Note 1:
+ - 45          :  - x              : - X           : - CAN(024): - Note 1:
+ - 46          :  - c              : - C           : - ETX(003): - Note 1:
+ - 47          :  - v              : - V           : - SYN(022): - Note 1:
+ - 48          :  - b              : - B           : - STX(002): - Note 1:
+ - 49          :  - n              : - N           : -  SO(014): - Note 1:
+ - 50          :  - m              : - M           : -  CR(013): - Note 1:
+ - 51          :  - ,              : - <           : - - 1     : - - 1   :
+ - 52          :  - .              : - >           : - - 1     : - - 1   :
+ - 53          :  - /              : - ?           : - - 1     : - - 1   :
+ - 54 Shift    :  - - 1            : - - 1         : - - 1     : - - 1   :
+ - 55          :  - *              : - (Note 2)    : - (Note 1): - - 1   :
+ - 56 Alt      :  - - 1            : - - 1         : - - 1     : - - 1   :
+ - 57          :  - - 1            : - - 1         : - - 1     : - - 1   :
+ - 58 Caps Lock:  - - 1            : - - 1         : - - 1     : - - 1   :
+ - 59 :  - Nul (Note 1)   : - (Nul Note 1): - (Nul Note 1): - (Nul Note 1)
+ - 60 :  - Nul (Note 1)   : - (Nul Note 1): - (Nul Note 1): - (Nul Note 1)
+ - 61 :  - Nul (Note 1)   : - (Nul Note 1): - (Nul Note 1): - (Nul Note 1)
+ - 62 :  - Nul (Note 1)   : - (Nul Note 1): - (Nul Note 1): - (Nul Note 1)
+ - 63 :  - Nul (Note 1)   : - (Nul Note 1): - (Nul Note 1): - (Nul Note 1)
+ - 64 :  - Nul (Note 1)   : - (Nul Note 1): - (Nul Note 1): - (Nul Note 1)
+--------------------------------------------------------------------------
+Character Codes (Part 3 of 3):
+--------------------------------------------------------------------------
+Key Number: Base Case     : Upper Case    : Ctrl          : Alt:
+ - 65     : - Nul (Note 1): - Nul (Note 1): - Nul (Note 1): - Nul (Note 1)
+ - 66     : - Nul (Note 1): - Nul (Note 1): - Nul (Note 1): - Nul (Note 1)
+ - 67     : - Nul (Note 1): - Nul (Note 1): - Nul (Note 1): - Nul (Note 1)
+ - 68     : - Nul (Note 1): - Nul (Note 1): - Nul (Note 1): - Nul (Note 1)
+ - 69 Num Lock: - - 1     : - - 1       : - Pause (Note 2): - - 1
+ - 70     : - - 1         : - - 1       : - Break (Note 2): - - 1
+ - Scroll Lock:
+--------------------------------------------------------------------------
+Keys 71 through 83 have meaning only in base case, in Num Lock (or shifted)
+states, or in Ctrl state. Note that the Shift key temporarily reverses the
+current Num Lock state.
+--------------------------------------------------------------------------
+Notes: 1. Refer to ''Extended Codes'' in this section.
+       2. Refer to ''Special Handling'' in this section.
+--------------------------------------------------------------------------
+Key Number:Num Lock:Base Case            :Alt   :Ctrl                    :
+ - 71     : - 7:     - Home    (Note 1)  : - - 1: - Clear Screen         :
+ - 72     : - 8:     - |^|     (Note 1)  : - - 1: - - 1                  :
+ - 73     : - 9:     - Page Up (Note 1)  : - - 1: - Top of Text and Home :
+ - 74     : - -:     - ------------------: - - 1: - - 1                  :
+ - 75     : - 4:     - <----     (Note 1): - - 1: - Reverse Word (Note 1):
+ - 76     : - 5:     - - 1               : - - 1: - - 1                  :
+ - 77     : - 6:     - ---->     (Note 1): - - 1: - Advance Word (Note 1):
+ - 78     : - +:     - +                 : - - 1: - - 1                  :
+ - 79     : - 1:     - End       (Note 1): - - 1: - Erase to EOL (Note 1):
+ - 80     : - 2:     - |V|       (Note 1): - - 1: - - 1                  :
+ - 81     : - 3:     - Page Down (Note 1): - - 1: - Erase to EOS (Note 1):
+ - 82     : - 0:     - Ins               : - - 1: - - 1                  :
+ - 83     : -  :     - Del   (Notes 1, 2):Note 2: - Note 2               :
+--------------------------------------------------------------------------
+Extended Codes:
+--------------------------------------------------------------------------
+Extended Functions:
+--------------------------------------------------------------------------
+For certain functions that cannot be represented in the standard ASCII
+code, an extended code is used. A character code of 000 (Nul) is returned
+in AL. This indicates that the system or application program should
+examine a second code that will indicate the actual function. Usually, but
+not always, this second code is the scan code of the primary key that was
+pressed. This code is returned in AH.
+--------------------------------------------------------------------------
+Keyboard Extended Functions:
+--------------------------------------------------------------------------
+Second Code: Function:
+ -   3     :  - Nul Character
+ -  15     :  - <----
+ -  16-25  :  - Alt Q, W, E, R, T, Y, U, I, O, P
+ -  30-38  :  - Alt A, S, D, F, G, H, J, K, L
+ -  44-50  :  - Alt Z, X, C, V, B, N, M
+ -  59-68  :  - F1 to F10 Function Keys Base Case
+ -  71     :  - Home
+ -  72     :  - |^|
+ -  73     :  - Page Up and Home Cursor
+ -  75     :  - <----
+ -  77     :  - ---->
+ -  79     :  - End
+ -  80     :  - |V|
+ -  81     :  - Page Down and Home Cursor
+ -  82     :  - Ins (Insert)
+ -  83     :  - Del (Delete)
+ -  84-93  :  - F11 to F20 (Uppsercase F1 to F10)
+ -  94-103 :  - F21 to F30 (Ctrl F1 to F10)
+ - 104-113 :  - F31 to F40 (Alt F1 to F10)
+ - 114     :  - Ctrl PrtSc (Start/Stop Echo to Printer)
+ - 115     :  - Ctrl<----(Reverse Word)
+ - 116     :  - Ctrl---->(Advance Word)
+ - 117     :  - Ctrl End [Erase to End of Line (EOL)]
+ - 118     :  - Ctrl PgDn [Erase to End of Screen (EOS)]
+ - 119     :  - Ctrl Home (Clear Screen and Home)
+ - 120-131 :  - Alt 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, -, = (Keys 2-13)
+ - 132     :  - Ctrl PgUp (Top 25 Lines of Text and Home Cursor)
+--------------------------------------------------------------------------
+Shift States:
+--------------------------------------------------------------------------
+Most shift states are handled within the keyboard routine, transparent to
+the system or application program. In any case, the current set of active
+shift states is available by calling an entry point in the ROM keyboard
+routine. The key numbers are shown on the keyboard diagram in Section 4.
+The following keys result in altered shift states:
+ - Ctrl:
+ This key temporarily shifts keys 3, 7, 12, 14, 16-28, 30-38, 43-50, 55,
+ 59-71, 73, 75, 77, 79, and 81 to the Ctrl state. Also, the Ctrl key is
+ used with the Alt and Del keys to cause the system reset function, with
+ the Scroll Lock key to cause the break function, and with the Num Lock
+ key to cause the pause function. The system reset, break, and pause
+ functions are described in ''Special Handling'' on the following pages.
+ - Alt:
+ This key temporarily shifts keys 2-13, 16-25, 30-38, 44-50, and 59-68 to
+ the Alt state. Also, the alt key is used with the Ctrl and Del keys to
+ cause the ''system reset'' function described in ''Special Handling'' on
+ the following pages.
+
+ The Alt key has another user. This key allows the user to enter any ASCII
+ any ASCII character code from 0 to 255 into the system from the keyboard.
+ The user holds down the Alt key and types the decimal value of the
+ characters desired using the numeric keypad (keys 71-73, 75-77, and 79-
+ 82). The Alt key is then released. If more than three digits are typed, a
+ modulo-256 result is created. These three digits are interpreted as a
+ character code and are transmitted through the keyboard routine to the
+ system or application program. Alt is handled within the keyboard routine.
+ - Caps Lock:
+ This key shifts keys 16-25, 30-38, and 44-50 to uppercase. Pressing the
+ Caps Lock key a second time reverses the action. Caps Lock is handled
+ within the keyboard routine.
+ - Scroll Lock:
+ This key is interpreted by appropriate application programs such as
+ indicating that use of the cursor-control keys should cause windowing
+ over the text rather than cursor movement. Pressing the Scroll Lock key
+ a second time reverses the action. The keyboard routine simply records
+ the current shift state of the Scroll Lock key. It is the responsibility
+ of the system or application program to perform the function.
+ - Shift Key Priorities and Combinations:
+ If combinations of the Alt, Ctrl, and Shift keys are pressed and only one
+ is valid, the precedence is as follows: the Alt key is first, the Ctrl
+ key is second, and the Shift key is third. The only valid combination is
+ Alt and Ctrl,, which is used in the system reset function.
+--------------------------------------------------------------------------
+Special Handling:
+--------------------------------------------------------------------------
+ - System Reset:
+ The combination of the Alt, Ctrl, and Del keys will result in the
+ keyboard routine initiating the equivalent of a system reset. System
+ reset is handled within keyboard routine.
+ - Break:
+ The combination of the Ctrl and Break keys will result in the keyboard
+ routine signaling interrupt hex 1A. Also the extended characters (AL =
+ hex 00, AH = hex 00) will be returned.
+ - Pause:
+ The combination of the Ctrl and Num Lock keys will cause the keyboard
+ interrupt routine to loop, waiting for any key except the Num Lock key to
+ be pressed. This provides a system- or application-transparent method of
+ temporarily suspending list, print, and so on, and then resuming the
+ operation. The ''unpause'' key is thrown away. Pause is handled within
+ the keyboard routine.
+ - Print Screen:
+ The combination of the Shift and Prtc (key 55) keys will result in an
+ interrupt invoking the print screen routine. This routine works in the
+ alphanumeric or graphics mode, with unrecognizable characters printing as
+ blanks.
+--------------------------------------------------------------------------
+Extended Functions:
+--------------------------------------------------------------------------
+The keyboard routine does its own buffering. The keyboard buffer is large
+enough that few typists will ever fill it. However, if a key is pressed
+when the buffer is full, the key will be ignored and the ''bell'' will
+sound.
+
+Also, the keyboard routine suppresses the typematic action of the
+following keys: Ctrl, Shift, Alt, Num Lock, Scroll Lock, Caps Lock, and
+Ins.
+--------------------------------------------------------------------------
+Keyboard Usage:
+--------------------------------------------------------------------------
+This section is intended to outline a set of guidelines of key usage when
+performing commonly used functions.
+--------------------------------------------------------------------------
+Keyboard - Commonly Used Functions (Part 1 of 2):
+--------------------------------------------------------------------------
+Function                   :Key(s)   :Comment                            :
+ - Home Cursor             : - Home  : - Editors; word processors
+ - Return to outermost menu: - Home  : - Menu driven applications
+ - Move cursor up          : - |^|   : - Full screen editor, word processor
+ - Page up, scroll backward
+ 25 lines and home         : - PgUp  : - Editors, word processors
+ - Move cursor left        :<--Key 75: - Text, command entry
+ - Move cursor right       : - ----> : - Text, command entry
+ - Scroll to end of text
+Place cursor at end of line: - End   : - Editors; word processors
+ - Move cursor down        : - |V|   : - Full screen editor, word processor
+ - Page down, scroll forward
+ 25 lines and home         : - Pg Dn : - Editors; word processors
+ - Start/Stop insert text at
+ cursor, shift text right in
+ buffer                    : - Ins   : - Text, command entry
+ - Delete character at
+ cursor                    : - Del   : - Text, command entry
+ - Destructive backspace   :<--Key 14: - Text, command entry
+ - Tab forward             : - --->| : - Text entry
+ - Tab reverse             : - |<--- : - Text entry
+ - Clear screen and home   :Ctrl Home: - Command entry
+ - Scroll up               : - |^|   : - In scroll lock mode
+ - Scroll down             : - |V|   : - In scroll lock mode
+ - Scroll left             : - <---- : - In scroll lock mode
+ - Scroll right            : - ----> : - In scroll lock mode
+ -Delete from cursor to EOL: CtrlEnd : - Text, command entry
+ - Exit/Escape             : - Esc   : - Editor, 1 level of menu, and so on
+ - Start/Stop/Echo screen to
+ printer                   :CtrlPrtSc: - Any time
+                           : (Key 55):
+ -Delete from cursor to EOS:Ctrl PgDn: - Text, command entry
+ - Advance word            : Ctrl--> : - Text entry
+ - Reverse word            : Ctrl<-- : - Text entry
+ - Window Right            : Ctrl--> : -When text is too wide to fit screen
+ - Window Left             : Ctrl<-- : -When text is too wide to fit screen
+ - Enter insert mode       : - Ins   : - Line editor
+--------------------------------------------------------------------------
+Keyboard - Commonly Used Functions (Part 2 of 2):
+--------------------------------------------------------------------------
+Function                   :Key(s)   :Comment                            :
+ - Exit insert mode        : - Ins   : - Line editor
+ - Cancel current line     : - Esc   : - Command entry, text entry
+ - Suspend system (pause)  : - Ctrl  : - Stop list, stop program, and so on
+                           :Num Lock : - Resumes on any key
+ - Break interrupt         :CtrlBreak: - Interrupt current process
+ - System reset            : AltCtrl : - Reboot
+                           :   Del   :
+ - Top of document and home:Ctrl PgUp: - Editors, word processors
+ cursor
+ - Standard function keys  : F1-F10  : - Primary function keys
+ - Secondary function keys:ShiftF1-F10:-Extra function keys if 10 are not
+                          :Ctrl F1-F10:sufficient
+                          : Alt F1-F10:
+ - Extra function keys    : Alt Keys  : - Used when templates are put
+                          :   2-13    : along top of keyboard
+                          :(1-9,0,~,=):
+ - Extra function keys    :  Alt A-Z  : - Used when function starts with
+                                        same letter as one of the alpha
+                                        keys
+--------------------------------------------------------------------------
+BASIC Screen Editor Special Functions:
+--------------------------------------------------------------------------
+Function                         :Key             :
+ - Carriage return               : - <---|
+ - Line feed                     : - Ctrl <---|
+ - Bell                          : - Ctrl G
+ - Home                          : - Home
+ - Cursor up                     : - |^|
+ - Cursor down                   : - |V|
+ - Cursor left                   : - <----
+ - Cursor right                  : - ---->
+ - Advance one word              : - Ctrl ---->
+ - Reverse one word              : - Ctrl <----
+ - Insert                        : - Ins
+ - Delete                        : - Del
+ - Clear screen                  : - Ctrl Home
+ - Freeze output                 : - Ctrl Num Lock
+ - Tab advance                   : - --->|
+ - Stop execution (break)        : - Ctrl Break
+ - Delete current line           : - Esc
+ - Delete to end of line         : - Ctrl End
+ - Position cursor to end of line: - End
+--------------------------------------------------------------------------
+DOS Special Functions:
+--------------------------------------------------------------------------
+Function                         :Key                            :
+ - Suspend                       : - Ctrl Num Lock               
+ - Echo to printer               : - Ctrl PrtSc (Key 55 any case)
+ - Stop echo to printer          : - Ctrl PrtSc (Key 55 any case)
+ - Exit current function (break) : - Ctrl Break
+ - Backspace                     : - <---- Key 14
+ - Line feed                     : - Ctrl<---|
+ - Cancel line                   : - Esc
+ - Copy character                : - F1 or ---->
+ - Copy until match              : - F2
+ - Copy remaining                : - F3
+ - Skip character                : - Del
+ - Skip until match              : - F4
+ - Enter insert mode             : - Ins
+ - Exit insert mode              : - Ins
+ - Make new line the template    : - F5
+ - String seperator in REPLACE   : - F6
+ - End of file in keyboard input : - F6
+--------------------------------------------------------------------------
+BIOS Cassette Logic:
+--------------------------------------------------------------------------
+Software Algorithims - Interrupt Hex 15:
+--------------------------------------------------------------------------
+The cassette routine is called by the request type in AH. The address of
+the bytes to be read from or written to the tape is specified ES:BX: and
+the number of bytes to be read or written is specified by CX. The number
+of bytes read is returned in DX. The read block and write block
+automatically turn the cassette motor on at the start and off at the end.
+The request types in AH and the cassette status descriptions follow:
+
+Request Type   : Function                                                :
+ - AH = 0 :       - Turn Cassette Motor On
+ - AH = 1 :       - Turn Cassette Motor Off
+ - AH = 2 :       - Read Tape Block
+                      Read CX bytes into memory starting at Address ES:BX
+                      Return actual number of bytes read in DX
+                      Return Cassette Status in AH
+ - AH = 3 :       - Write Tape Block
+Cassette Status: Description:
+ - AH = 00:       - No Errors
+ - AH = 01:       - Cyclic Redundancy Check (CRC) Error in Read Block
+ - AH = 02:       - No Data Transitions
+ - AH = 04:       - No Leader
+ - AH = 80:       - Invalid Command
+NOTES: The carry flag will be set on any error.
+--------------------------------------------------------------------------
+Cassette Write:
+--------------------------------------------------------------------------
+The write block routine writes a tape block onto the cassette tape. The
+tape block is described in ''Data Record Architecture'' later in this
+section.
+
+The write-block routine turns on the cassette drive motor and a
+synchronization bit(0) and then writes the leader(256 bytes of all 1's) to
+the tape. Next, the routine writes the number of data blocks specified by
+CX. After each data block of 256 bytes, a 2-byte cyclic redundancy check
+(CRC) is written. The data bytes are taken from the memory location
+pointed at by ES.
+
+The write-byte routine disassembles and writes the byte a bit at a time to
+the cassette. The method used is to set Timer 2 to the period of the
+desired data bit. The timer is set to a period of 1.0-ms for a 1 bit and
+0.5-ms for a 0 bit.
+
+The timer is set to mode 3, which means the timer outputs a square wave
+with a period given by its count register. The timer's period is changed
+on the fly for each data bit written to the cassette. If the number of
+data bytes to be written is not an integral multiple of 256, then, after
+the last desired data byte from memory has been written, the data block is
+extended to 256 bytes of writing multiples of the last data byte. The last
+block is closed with two CRC bytes as usual. After the last data block, a
+trailer consisting of four bytes of all 1 bits is written. Finally, the
+cassette motor is turned off, if there are no errors reported by the
+routine.
+|<----250 us-->|
+
+|--------------|              |
+|              |--------------|                           Zero Bit:
+
+|<---------500 us------------>|
+
+|-----------------------------|                             |
+|                             |-----------------------------|
+
+|<--------------------------1000 us------------------------>|
+--------------------------------------------------------------------------
+Cassette Read:
+--------------------------------------------------------------------------
+The read-block routine turns on the cassette drive motor and then delays
+for about 0.5 second to allow the motor to come up to speed.
+
+The read-block routine then searches for the leader and must detect all 1
+bits for approximately 1/4 of the leader length before it can look for the
+sync (0) bit. After the sync bit is detected, the sync byte (ASCII
+character hex 16) is read. If the sync byte is read correctly, the data
+portion can be read. If a correct sync byte is not found, the routine goes
+back and searches for the leader again. The data is read a bit at a time
+and assembled into bytes. After each byte is assembled, it is written into
+memory at location ES:BX and BX is incremented by 1.
+
+After each multiple of 256 data bytes is read, the CRC is read and
+compared to the CRC generated. If a CRC error is detected, the routine
+exists with the carry flag set to indicate an error and the status of AH
+set to hex 01. DX contains the number of bytes written to memory.
+
+The time of day interrupt(IRQ0) is disabled during the cassette-read
+operation.
+--------------------------------------------------------------------------
+Data Record Architecture:
+--------------------------------------------------------------------------
+The write-block routine uses the following format to record a tape block
+onto a cassette tape.
+--------------------------------------------------------------------------
+Leader: Sync Bit: Sync Byte: Data Block: CRC: Data Block: CRC:
+   ^                                                               |
+   |                                                               V
+Motor On                                                        Motor Off
+--------------------------------------------------------------------------
+Data Record Components:
+--------------------------------------------------------------------------
+Component     :Description:
+ - Leader     : - 256 Bytes (of All 1's)
+ - Sync Bit   : - One 0 Bit
+ - Sync Byte  : - ASCII Character Hex 16
+ - Data Blocks: - 256 Bytes in Length
+ - CRC        : - 2 Bytes for each Data Block
+--------------------------------------------------------------------------
+Error Recovery:
+--------------------------------------------------------------------------
+Error recovery is handled through software. A CRC is used to detect errors.
+The polynomial used is G(X) = X16+X32+X5+1, which is the polynomial used
+by the synchronous data link control interface. Essentially, as bits are
+written to or read from the cassette tape, they are passed through the CRC
+register in software. After a block of data is written, the complemented
+value of the calculated CRC register is written on the tape. On reading
+the cassette data, the CRC bytes are read and compared to the generated
+CRC value. If the read CRC does not equal the AH is set to hex 01, which
+indicates a CRC error has occurred. The routine is exited on a CRC error.
+--------------------------------------------------------------------------
+System BIOS Listing:
+--------------------------------------------------------------------------
+Quick Reference:                                       Page : Line Number:
+--------------------------------------------------------------------------
+System ROM BIOS:
+ - Equates                                :           5--30 :   12
+ - 8088 Interrupt Locations               :           5--30 :   34
+ - Stack                                  :           5--30 :   66
+ - Data Areas                             :           5--30 :   74
+ - Power-On Self-Test                     :           5--33 :  229
+ - Boot Strap Loader                      :           5--49 : 1493
+ - I/O Support                            :
+ - - Asynchronous Communications (RS-232C):           5--50 : 1551
+ - - Keyboard                             :           5--54 : 1818
+ - - Diskette                             :           5--64 : 2426
+ - - Printer                              :           5--74 : 3201
+ - - Display                              :           5--75 : 3327
+ - System Configuration Analysis          :
+ - - Memory Size Determination            :           5-101 : 5177
+ - - Equipment Determination              :           5-101 : 5208
+ - Cassette I/O Support                   :           5-102 : 5253
+ - Graphics Character Generator           :           5-108 : 5769
+ - Time of Day                            :           5-110 : 5903
+ - Print Screen                           :           5-112 : 6077
+--------------------------------------------------------------------------
