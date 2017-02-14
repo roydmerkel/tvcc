@@ -1,0 +1,11 @@
+Wireless Adapter Properties:
+SSID: 1JCY6
+Protocol: 802.11g
+Security type: Open
+Network band: 2.4 GHz
+Network channel: 6
+IPv4 address: 192.168.1.7
+Manufacturer: Ralink Technology, Corp.
+Description: Ralink RT5390R 802.11b/g/n 1x1 Wi-Fi Adapter
+Driver version: 5.0.57.0
+Physical address (MAC): 68-94-23-A8-A5-FC
